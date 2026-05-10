@@ -1,7 +1,7 @@
 import iziToast from 'izitoast';
 import 'izitoast/dist/css/iziToast.min.css';
 import { getImagesByQuery } from './js/pixabay-api.js';
-import * as renderFunc from './js/render-functions.js'; // Імпортуємо все як об'єкт
+import * as renderFunc from './js/render-functions.js';
 
 const form = document.querySelector('.form');
 const gallery = document.querySelector('.gallery');
@@ -19,10 +19,7 @@ async function handleSearch(event) {
   event.preventDefault();
   currentQuery = event.currentTarget.elements.searchQuery.value.trim();
   
-  if (!currentQuery) {
-    iziToast.warning({ message: 'Please enter a search query' });
-    return;
-  }
+  if (!currentQuery) return;
 
   page = 1;
   renderFunc.clearGallery(gallery);
@@ -34,18 +31,22 @@ async function handleSearch(event) {
     
     if (data.hits.length === 0) {
       iziToast.error({ message: 'Sorry, there are no images matching your search query.' });
+      renderFunc.hideLoadMoreButton(btnLoadMore); 
       return;
     }
 
-    gallery.innerHTML = renderFunc.createGallery(data.hits);
-    renderFunc.refreshLightbox();
+    
+    renderFunc.renderGallery(gallery, data.hits);
 
-  
-    if (data.totalHits > perPage) {
+    
+    if (data.totalHits <= perPage) {
+      renderFunc.hideLoadMoreButton(btnLoadMore);
+      iziToast.info({ message: "We're sorry, but you've reached the end of search results." });
+    } else {
       renderFunc.showLoadMoreButton(btnLoadMore);
     }
   } catch (error) {
-    iziToast.error({ message: 'Something went wrong!' });
+    iziToast.error({ message: 'Error fetching images!' });
   } finally {
     renderFunc.hideLoader(loader);
     form.reset();
@@ -61,12 +62,15 @@ async function handleLoadMore() {
     const data = await getImagesByQuery(currentQuery, page);
     
    
-    gallery.insertAdjacentHTML('beforeend', renderFunc.createGallery(data.hits));
-    
-    renderFunc.refreshLightbox();
-    renderFunc.smoothScroll();
+    renderFunc.renderGallery(gallery, data.hits, true);
 
     
+    const card = document.querySelector('.gallery-item');
+    if (card) {
+      const { height } = card.getBoundingClientRect();
+      window.scrollBy({ top: height * 2, behavior: 'smooth' });
+    }
+
     const totalPages = Math.ceil(data.totalHits / perPage);
     if (page >= totalPages) {
       renderFunc.hideLoadMoreButton(btnLoadMore);
